@@ -1,0 +1,32 @@
+routing_strategy: round_robin
+
+model_list:
+  - model_name: resnet18-cv         # tên “model” khi gọi qua LiteLLM
+    litellm_provider: sagemaker
+    endpoint_name: resnet18-endpoint  # TÊN endpoint trong SageMaker
+    aws_region_name: ap-southeast-1   # region của endpoint
+
+    # (QUAN TRỌNG) Khai báo content handler để gửi/nhận JSON base64
+    content_handler:
+      # kiểu dữ liệu gửi lên endpoint (tùy handler JumpStart, đa số nhận application/json)
+      content_type: application/json
+      accept: application/json
+      # format request (LiteLLM -> SageMaker)
+      input:
+        type: json
+        # field “image_base64” sẽ chứa ảnh base64 do ta encode
+        template: |
+          {
+            "image_base64": "{image_base64}",
+            "top_k": 5
+          }
+      # format response (SageMaker -> LiteLLM)
+      output:
+        type: json
+        # map kết quả về text (choices[0].message.content)
+        # giả định endpoint trả: {"labels": ["class1",...], "probs":[0.9,...]}
+        template: |
+          Top-5:
+          {% for i in range(min(5, labels|length)) -%}
+          {{i+1}}. {{labels[i]}} ({{"%.2f"|format(probs[i]*100)}}%)
+          {% endfor %}
